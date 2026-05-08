@@ -1,0 +1,19 @@
+{
+  "author": "Kaio-Eduardo-Adorno",
+  "name": "case-eng-dist",
+  "description": "",
+  "scripts": {
+    "start:all": "concurrently -n \"FRONT,BACK,QUOTES\" -c \"blue,green,magenta\" \"npm run start:gestao-ativos-frontend\" \"npm run start:gestao-ativos-backend\" \"npm run start:quotation-service\"",
+    "start:gestao-ativos-frontend": "cd ./gestao-ativos-frontend && npm run dev",
+    "start:gestao-ativos-backend": "cd ./gestao-ativos-backend && npm run start:dev",
+    "start:quotation-service": "cd ./quotation-service && npm run dev",
+    "install:all": "npm install && npm run install:gestao-ativos-frontend && npm run install:gestao-ativos-backend && npm run install:quotation-service",
+    "install:gestao-ativos-frontend": "cd ./gestao-ativos-frontend && npm install",
+    "install:gestao-ativos-backend": "cd ./gestao-ativos-backend && npm install && npm run migration:run && npm run seed",
+    "install:quotation-service": "cd ./quotation-service && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0"
+  }
+}

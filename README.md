@@ -1,324 +1,171 @@
-# 🚀 Desafio Técnico — Sistema de Ordens de Investimento
+# Aplicação de gestão de ativos
 
-## Bem-vindo(a)!
+## 1. Como executar o projeto
 
-Obrigado por participar do nosso processo seletivo! Este desafio foi pensado para avaliar suas habilidades de forma prática, simulando problemas reais do nosso dia a dia.
+### Requisitos
 
-Leia este documento com calma antes de começar. Ele contém tudo que você precisa saber.
+- NodeJs v24.11.1
+- Docker
+- PostgreSQL (docker compose disponibilizado no projeto)
 
----
+**Instalando as dependências**
 
-## Índice
-
-- [Visão Geral](#visão-geral)
-- [O que já está no repositório](#o-que-já-está-no-repositório)
-- [Parte 1 — Código](#parte-1--código)
-- [Parte 2 — Arquitetura AWS](#parte-2--arquitetura-aws)
-- [Entregas esperadas](#entregas-esperadas)
-- [Dicas](#dicas)
-
----
-
-## Visão Geral
-
-Sua missão é construir do zero um **Sistema de Ordens de Investimento** — composto por um **backend** e um **frontend** — que permita aos usuários comprar e vender ativos financeiros (ações, criptomoedas, etc.).
-
-### O que você vai construir
-
-| Camada    | O que fazer                  |
-|-----------|------------------------------|
-| Backend   | API de ordens em Node.js + TypeScript |
-| Frontend  | Interface em Next.js ou Angular |
-
-O sistema que você construir deve permitir que usuários:
-
-- Visualizem ativos disponíveis e seus preços atuais
-- Criem ordens de compra e venda
-- Acompanhem o status das ordens em tempo real
-- Visualizem seu saldo e histórico de operações
-
-### O que já está pronto no repositório
-
-O repositório inclui um **Serviço de Cotações** que você **não precisa implementar** — apenas consumir.
-
-Ele simula um fornecedor externo de preços de ativos. Seu backend vai consultá-lo durante o processamento das ordens para obter o preço atual de cada ativo.
-
-> ⚠️ Esse serviço é **intencionalmente instável**: falha de forma aleatória e tem latência variável. Sua solução precisa lidar com isso.
-
-![alt text](image.png)
-
-### Ciclo de vida de uma ordem
-
-![alt text](image-1.png)
-
-> ⚠️ **Este desafio tem duas partes independentes.** Elas compartilham o mesmo contexto de negócio, mas têm objetivos de avaliação distintos. O que você desenha na arquitetura não precisa estar implementado no código, e vice-versa.
-
----
-
-## O que já está no repositório
-
-### Como rodar o serviço de cotações
+É importante que neste passo o docker esteja rodando (caso a database e o schema não estejam sendo criados na base, tente rodar o seguinte comando "docker compose down -v" e depois "docker compose up -d")
 
 ```bash
-cd quotation-service
-npm install
-npm start
+  $ docker compose up -d
 ```
 
-O serviço estará disponível em `http://localhost:3001`.
+Após subir o container no docker só precisa rodar este comando que instalara as dependências e populara o banco de dados com os dados iniciais
 
-> **Node.js 18 ou superior** é necessário para rodar o serviço.
+```bash
+  $ npm run install:all
+```
 
-### Endpoints disponíveis
+**Rodando localmente**
 
-| Método | Endpoint               | Descrição                              |
-|--------|------------------------|----------------------------------------|
-| GET    | `/quotations`          | Lista todas as cotações                |
-| GET    | `/quotations/:symbol`  | Retorna cotação de um ativo específico |
-| GET    | `/health`              | Verifica se o serviço está no ar       |
+Pode-se rodar a aplicação utilizando 3 terminais cada um rodando um dos sistemas
 
-### ⚠️ Comportamento intencional do serviço
+```bash
+  $ npm run start:gestao-ativos-frontend
+```
 
-Como mencionado na visão geral, esse serviço **falha aleatoriamente** e **tem latência variável**. Isso é proposital. Sua solução precisa continuar funcionando mesmo quando ele falhar — e você vai documentar como tratou isso.
+```bash
+  $ npm run start:gestao-ativos-backend
+```
 
----
+```bash
+  $ npm run start:quotation-service
+```
 
-## Parte 1 — Código
+ou (não recomendo muito pois causou algumas instabilidades)
 
-### Stack obrigatória
+```bash
+  $ npm run start:all
+```
 
-| Tecnologia      | Requisito                             |
-|-----------------|---------------------------------------|
-| TypeScript      | Obrigatório no backend                |
-| Node.js         | Runtime do backend                    |
-| Next.js ou Angular | Escolha um para o frontend         |
-| Banco de dados  | Sua escolha (PostgreSQL, MongoDB, etc.) |
-| Testes          | Unitários e de integração             |
+**Acessando o frontend**
 
-### O que você precisa construir
+1.  Acesse a url: http://localhost:3000
+2.  Você sera redirecionado para o login para logar basta usar o email "joao@teste.com" e a senha "12345678"
 
-#### Backend — API de Ordens
+**Executar testes unitários backend**
 
-Implemente os seguintes comportamentos:
+```bash
+  $ cd ./gestao-ativos-backend
+  $ npm run test:cov
+```
 
-1. **Listar ativos disponíveis** com cotação atual
-2. **Criar uma ordem** de compra ou venda
-3. **Listar ordens do usuário**
-4. **Detalhar uma ordem** específica
-5. **Cancelar uma ordem** pendente
-6. **Consultar posição do usuário** em cada ativo (saldo)
+**(Não foi feito) Executar testes E2E backend**
+Por conta de ter surgido um bug que eu não tinha pensado que poderia ocorrer acabei não tendo de tempo de fazer.
 
-#### Regras de negócio
 
-**Criação de ordem:**
-- Uma ordem deve conter: símbolo, tipo (COMPRA ou VENDA), quantidade e preço
-- Ordens de venda só podem ser criadas se o usuário tiver saldo suficiente do ativo
-- Ao ser criada, a ordem entra com status **PENDENTE**
+# 2. Tratamento de concorrência
 
-**Processamento de ordem:**
-- O sistema deve consultar o serviço de cotações para obter o preço atual
-- O sistema deve ser **resiliente a falhas** do serviço de cotações — documente como você tratou isso
-- Após o processamento com sucesso, o status muda para **EXECUTADA**
-- Em caso de falha no processamento, o status muda para **REJEITADA**
+Para lidar com o cenário de ordens simultâneas especialmente o clássico problema de duplicação por "double-click" do usuário ou retentativas automáticas de rede, optei por implementar o padrão de Chaves de Idempotência (Idempotency Keys).
 
-**Cancelamento:**
-- Ordens com status **PENDENTE** podem ser canceladas
-- Ordens **PROCESSANDO** ou **EXECUTADAS** não podem ser canceladas
+A Solução Implementada:
+Adicionei uma coluna idempotency_key com restrição de unicidade (UNIQUE CONSTRAINT) na tabela de ordens. A mecânica funciona da seguinte forma:
 
-**Saldo:**
-- Ao executar uma compra, a quantidade do ativo **aumenta**
-- Ao executar uma venda, a quantidade do ativo **diminui**
+O client-side (frontend) gera um identificador único (UUID) no momento em que o usuário tenta enviar a ordem e o anexa ao cabeçalho da requisição (Idempotency-Key).
 
-#### Frontend — Interface do usuário
+Quando o backend recebe a requisição, ele tenta persistir a ordem atrelando essa chave ao registro.
 
-Implemente as seguintes telas/funcionalidades:
+Se duas requisições idênticas chegarem ao banco de dados exatamente ao mesmo tempo, a primeira transação efetiva a inserção, enquanto a segunda é rejeitada na camada do banco de dados por violação de unicidade. O backend intercepta essa falha e pode ignorar a segunda ordem com segurança, evitando a duplicidade do processamento e do débito de saldo.
 
-| Funcionalidade       | Descrição                                                       |
-|----------------------|-----------------------------------------------------------------|
-| Lista de ativos      | Exibe ativos disponíveis com preço atual e botão para criar ordem |
-| Lista de ordens      | Exibe ordens com status, permite filtrar e cancelar             |
-| Posição do usuário   | Visão consolidada do saldo em cada ativo                        |
-| Formulário de ordem  | Modal ou página para criar uma nova ordem                       |
+Trade-offs da Solução:
 
-> O frontend não precisa ser visualmente elaborado. Foque em funcionalidade e usabilidade. Sinta-se à vontade para usar bibliotecas de componentes como Material UI, Tailwind, PrimeNG, etc.
+Vantagens (Prós):
 
----
+Simplicidade e Performance: Não exige infraestrutura adicional (como Redis para controle de Distributed Locks). O controle de concorrência é delegado às propriedades ACID do próprio banco de dados relacional.
 
-### Dados iniciais (seed)
+Garantia na Borda: Resolve o problema de retentativas de rede (quando o front não recebe o timeout e tenta de novo), garantindo que a intenção do usuário seja processada exatamente uma vez (Exactly-once semantics).
 
-Ao rodar o projeto, popule o banco com os dados abaixo:
+Baixa latência: A checagem de unicidade em um índice do banco é extremamente rápida.
 
-#### Ativos disponíveis
+Desvantagens e Pontos de Atenção (Contras):
 
-| Símbolo | Nome              | Cotação de referência |
-|---------|-------------------|----------------------|
-| ITUB4   | Itaú Unibanco PN  | R$ 32,80             |
-| ITUB3   | Itaú Unibanco ON  | R$ 15,40             |
-| USDC    | USD Coin          | R$ 5,50              |
-| SOL     | Solana            | R$ 418,07            |
-| BTC     | Bitcoin           | R$ 350.000,00        |
-| ETH     | Ethereum          | R$ 18.500,00         |
+Dependência do Client: A solução confia que o frontend gerará o UUID corretamente por intenção de clique. Se o cliente for malicioso ou mal implementado (gerando uma chave nova a cada requisição automática), a proteção é contornada.
 
-#### Usuário de teste
+Não resolve concorrência de saldo: A chave de idempotência evita a criação de ordens duplicadas do mesmo usuário. No entanto, para evitar que uma mesma ordem concorra com outra diferente estourando o saldo limite da conta, essa estratégia precisa atuar em conjunto com Transações de Banco de Dados (usando Pessimistic Locking como SELECT ... FOR UPDATE nos saldos, ou Optimistic Locking com controle de versão) durante o processamento (Worker).
 
-| ID       | Nome             |
-|----------|------------------|
-| user-001 | João Investidor  |
+Essa abordagem foi escolhida por entregar o maior valor de proteção para a experiência do usuário com a menor complexidade arquitetural no momento de criação da ordem.
 
-#### Saldo inicial do usuário
+# 3. Tratamento de falhas
 
-| Símbolo | Quantidade | Preço médio |
-|---------|------------|-------------|
-| ITUB4   | 100        | R$ 30,00    |
-| USDC    | 50         | R$ 3,94     |
+Para garantir a resiliência do sistema e a segurança financeira das operações, a arquitetura foi desenhada para degradar graciosamente em caso de falhas, dividindo o tratamento em dois cenários principais: falhas parciais e falhas totais do serviço de cotações.
 
-> Fique à vontade para adicionar mais ativos ou usuários se quiser.
+O que acontece quando o serviço de cotações falha?
 
----
+A rotina de atualização de preços (AtualizarCotacaoWorker) foi construída com um mecanismo de isolamento de falhas:
 
-### Cenário de concorrência — pense sobre isso
+Falha Parcial (Isolamento com Promise.allSettled): Se a cotação de um ativo específico (ex: ITUB4) falhar, mas a de outro (ex: BTC) retornar com sucesso, o uso do Promise.allSettled garante que a falha de um não quebre a atualização do outro. O sistema apenas registrará um erro isolado no log para o ativo problemático e continuará atualizando o restante do mercado normalmente.
 
-Considere a seguinte situação:
+Falha Total (Queda do Serviço Externo): Caso a fonte primária de cotações caia por completo, a exceção é capturada pelo bloco try/catch global do Worker. O serviço não "crasha" (não derruba a aplicação). Em vez disso, ele registra a falha crítica no log e encerra o ciclo. Graças ao decorador @Interval(5000), o próprio Worker atua como um mecanismo natural de Retry contínuo (polling), tentando buscar os preços novamente 5 segundos depois.
 
-> *João tem 100 unidades de ITUB4. No mesmo instante, ele envia duas ordens de venda de 80 unidades cada.*
+O que acontece com a ordem do cliente?
 
-Responda na documentação:
-- O que deveria acontecer?
-- O que a sua implementação faz nesse caso?
-- Quais são os trade-offs da sua abordagem?
+A integridade da ordem do cliente é a prioridade máxima. Se o serviço de cotações falhar:
 
----
+Proteção contra preços defasados: As cotações no banco de dados ficarão "congeladas" no último valor válido conhecido.
 
-### Sugestões ao fornecedor de cotações
+# 4. Sugestões ao fornecedor — melhorias que você solicitaria ao serviço de cotações externo
 
-O serviço de cotações simula um fornecedor externo instável. Pense: se você pudesse solicitar melhorias a esse fornecedor, o que pediria para facilitar a integração e aumentar a resiliência do seu sistema?
+1. Implementação de WebSockets ou Webhooks (Streaming)
+   Melhoria: Substituir ou complementar o modelo de Polling (HTTP GET) por uma conexão persistente via WebSocket.
 
-Documente suas sugestões e explique o benefício de cada uma.
+Justificativa: No modelo atual, o backend precisa "perguntar" o preço a cada 5 segundos. Com WebSockets, o fornecedor faria o push da cotação apenas quando houver mudança de preço. Isso reduz o tráfego de rede desnecessário, diminui a carga no nosso backend e permite que o usuário veja a mudança de preço em milissegundos (Real-time de baixa latência).
 
----
+2. Suporte a Busca em Lote (Batch Requests) Otimizada
+   Melhoria: Permitir que o endpoint de cotações aceite filtros específicos via Query Params (ex: ?symbols=ITUB4,BTC,ETH).
 
-### O que avaliaremos na Parte 1
+Justificativa: Atualmente, o serviço retorna todos os ativos disponíveis. À medida que o mercado cresce para milhares de ativos, baixar o payload completo torna-se ineficiente. Filtrar apenas os ativos que temos em custódia ou que estão sendo visualizados reduziria o tempo de parsing e o consumo de memória do nosso Worker.
 
-| Critério                        | O que observamos                                                                                          |
-|---------------------------------|-----------------------------------------------------------------------------------------------------------|
-| **Regras de negócio**           | As regras de negócio estão implementadas corretamente e de forma completa?                               |
-| **Resiliência**                 | O sistema continua funcionando quando o serviço de cotações falha?                                       |
-| **Tratamento de concorrência**  | Ordens simultâneas conflitantes são tratadas de forma consistente?                                       |
-| **Qualidade do código**         | O código é legível, organizado e segue boas práticas gerais de desenvolvimento? Os patterns adotados fazem sentido para o problema? |
-| **Logs**                        | Os logs são claros, bem classificados e úteis para operar e investigar o sistema?   |
-| **Testes**                      | Os testes cobrem casos relevantes, incluindo falhas e cenários de borda?                                 |
-| **Documentação**                | O README explica claramente como rodar o projeto e as decisões técnicas tomadas?                         |
+# 5. Decisões e trade-offs — o que você priorizou, o que ficou de fora, o que faria diferente com mais tempo
 
----
+A arquitetura desta solução foi guiada por um princípio pragmático: entregar o maior valor e segurança para o core business (processamento de ordens e atualização de cotações), mantendo a complexidade técnica adequada para o tempo disponível.
 
-### Documentação esperada — Parte 1 (no seu README)
+1. O que eu priorizei (Decisões Arquiteturais)
+   Consistência e Resiliência no Backend: Priorizei a segurança financeira da aplicação. Implementei chaves de idempotência para evitar ordens duplicadas e construí o Worker de cotações utilizando Promise.allSettled, garantindo que a falha em um ativo não derrube o ecossistema inteiro.
 
-Inclua no README do seu repositório:
+   1.1. Tempo Real "Pragmático" (Short Polling): No frontend, priorizei a sensação de "Home Broker ao vivo" implementando um polling eficiente (a cada 5 segundos) em vez de exigir que o usuário atualizasse a página. Utilizei paginação de estado silenciosa no React para evitar flickers (piscar de tela) de loading.
 
-1. **Como executar o projeto** — passo a passo para rodar backend, frontend e o serviço de cotações. Inclua versões necessárias (Node, etc.)
-2. **Tratamento de concorrência** — como você abordou o cenário das ordens simultâneas e os trade-offs da sua solução
-3. **Tratamento de falhas** — o que acontece quando o serviço de cotações falha? O que acontece com a ordem do cliente?
-4. **Sugestões ao fornecedor** — melhorias que você solicitaria ao serviço de cotações externo
-5. **Decisões e trade-offs** — o que você priorizou, o que ficou de fora, o que faria diferente com mais tempo
-6. **Premissas assumidas** — se algo não ficou claro no enunciado, documente o que você assumiu e por quê
+   1.2 Arquitetura Limpa e Developer Experience (DX): Priorizei um código fácil de manter. No NestJS, criei um EnvService tipado para evitar erros com variáveis de ambiente. No Next.js, utilizei a exportação estática (output: 'export') para baratear custos de infraestrutura do frontend.
 
----
+2. O que ficou de fora (Trade-offs e Débitos Técnicos Conscientes)
+   Toda decisão de software envolve trade-offs. Para entregar o MVP no prazo, deixei de fora:
 
-## Parte 2 — Arquitetura AWS
+WebSockets / Server-Sent Events (SSE): O polling de 5 segundos funciona bem para poucos usuários, mas não escala horizontalmente de forma eficiente. O trade-off foi aceitar um maior número de requisições HTTP (GET) no backend em troca da velocidade e simplicidade de implementação do frontend e da API REST.
 
-Nesta parte, você não precisa escrever código. O objetivo é avaliar como você pensa em sistemas escaláveis, resilientes e preparados para crescer.
+Motor de Mensageria (Kafka/RabbitMQ): Atualmente, a ordem é processada e inserida de forma síncrona/direta no banco. Em um cenário real de altíssima concorrência na bolsa, deixei de fora uma fila de mensageria que atuaria como buffer (amortecedor) para processar as ordens de forma assíncrona.
 
-> Você pode (e deve) incluir no diagrama componentes que **não estão implementados no código**. Esta parte é independente.
+Cobertura de Testes (Unitários e E2E): Focando na entrega end-to-end da funcionalidade (banco, api, frontend e docker), o trade-off mais doloroso foi a ausência de uma suíte robusta de testes com Jest e Supertest.
 
----
+Autenticação Completa (OAuth/SSO): Assumimos um fluxo simplificado de JWT (mock/localStorage) para focar na regra de negócio de investimentos.
 
-### Contexto do produto
+3. O que eu faria diferente com mais tempo (Próximos Passos)
+   Se eu tivesse mais tempo para evoluir esta aplicação para um cenário de produção de larga escala, eu aplicaria as seguintes melhorias:
 
-O sistema de ordens que você implementou na Parte 1 é a versão inicial de um produto que vai crescer. Ao desenhar a arquitetura, considere que:
+Migração para Event-Driven: Desacoplaria a rota de criação de ordens. A API apenas receberia a ordem, validaria o saldo, e enviaria para um tópico Kafka/RabbitMQ. Um microserviço (ou Worker isolado) consumiria essa fila e faria o matching e a execução da ordem.
 
-**O volume será significativo desde o início:**
+Camada de Cache (Redis): O endpoint de listagem de cotações (GET /ativos) sofre muita pressão devido ao polling dos usuários. Eu implementaria um cache em Redis, pois cotações são dados de leitura intensiva.
 
-| Métrica                       | Volume        |
-|------------------------------|---------------|
-| Ordens por segundo           | ~1.000        |
-| Usuários simultâneos         | ~50.000       |
-| Consultas de cotação/segundo | ~10.000       |
+Matemática de Precisão Financeira: Substituiria o tipo Number padrão do TypeScript por bibliotecas como decimal.js ou big.js no momento do cálculo de saldo e posições, eliminando qualquer risco futuro de perda de precisão com pontos flutuantes (padrão IEEE 754).
 
-**O produto vai evoluir:**
-- Hoje dependemos de um único provedor externo de cotações. No roadmap, outros provedores serão integrados — por redundância ou por cobertura de novos mercados.
-- Hoje operamos com ações e criptomoedas. Novos tipos de ativos serão adicionados ao longo do tempo.
+Integração WebSockets no Frontend: Substituiria o polling do React por uma conexão WebSocket via Socket.io ou SSE para receber atualizações de status de ordens e cotações de forma instantânea via push do servidor.
 
-**O contexto é financeiro:**
-Estamos lidando com o dinheiro dos clientes. Qualquer inconsistência no processamento de uma ordem — seja por falha, por sobrecarga ou por indisponibilidade de um componente — tem impacto direto e real na vida das pessoas. A arquitetura precisa refletir essa responsabilidade.
+# 6. Premissas assumidas — se algo não ficou claro no enunciado, documente o que você assumiu e por quê
 
-**A dependência externa é instável:**
-O serviço de cotações é de terceiros. Ele falha, tem latência variável e não está sob nosso controle. O sistema precisa continuar operando de forma segura mesmo quando essa dependência não responde.
+Durante o desenvolvimento, identifiquei lacunas no enunciado que exigiram tomadas de decisão arquiteturais para garantir a viabilidade e a segurança da aplicação. As principais premissas assumidas foram:
 
----
+1. Necessidade de Autenticação e Contexto de Usuário
+   Premissa: Assumi que o sistema não poderia operar de forma anônima. Desenvolvi um fluxo de Login (JWT) para identificar o autor das ordens.
+   Por quê: Em sistemas financeiros, a rastreabilidade é mandatória. Sem um usuário autenticado, não haveria como vincular a custódia dos ativos ou validar se a ordem de compra pertence a uma carteira específica, impossibilitando a persistência correta na tabela de ordens e posições.
 
-### O que você precisa entregar
+2. Controle Prévio de Saldo (Pre-trade Validation)
+   Premissa: Assumi que o sistema deve bloquear ordens de compra caso o usuário não possua saldo financeiro disponível no momento do envio.
+   Por quê: Permitir o envio de ordens sem lastro financeiro geraria inconsistências graves no banco de dados e no fluxo de liquidação. Implementei uma validação que consulta a tabela de saldos antes de permitir a criação da ordem, garantindo que o "João Investidor" só execute operações condizentes com seu patrimônio líquido.
 
-Um **diagrama de arquitetura AWS** mostrando como essa solução rodaria em produção, acompanhado de documentação escrita.
-
-O diagrama pode ser feito em qualquer ferramenta. O importante é ser legível e ter legenda.
-
----
-
-### O que avaliaremos na Parte 2
-
-| Critério                    | O que observamos                                                                                     |
-|-----------------------------|------------------------------------------------------------------------------------------------------|
-| **Escolha de serviços**     | Os serviços AWS escolhidos fazem sentido para o problema? As alternativas foram consideradas?        |
-| **Escalabilidade**          | A arquitetura aguenta os volumes descritos? Os gargalos estão identificados?                         |
-| **Resiliência**             | O sistema continua operando com segurança quando componentes falham?                                 |
-| **Integridade financeira**  | A arquitetura garante que operações sobre o dinheiro dos clientes sejam confiáveis e rastreáveis?   |
-| **Visão de produto**        | O design suporta a evolução do produto sem grandes refatorações?                                     |
-| **Segurança**               | A arquitetura trata adequadamente autenticação, autorização e proteção de dados?                     |
-| **Observabilidade**         | É possível operar, monitorar e investigar incidentes nesse sistema?                                  |
-
-> ⚠️ Este diagrama será discutido em profundidade na entrevista técnica. Prepare-se para explicar suas decisões.
-
----
-
-### Documentação esperada — Parte 2
-
-Inclua um arquivo separado (ex: `ARCHITECTURE.md`) com:
-
-1. **Diagrama de arquitetura** com legenda explicando cada componente e sua função
-2. **Justificativa das escolhas** — por que cada serviço AWS foi escolhido? Quais alternativas você considerou e por que descartou?
-3. **Como a arquitetura escala** — como cada camada se comporta sob os volumes descritos? Onde estão os gargalos?
-4. **Como a arquitetura lida com falhas** — o que acontece quando componentes ficam indisponíveis? Como o sistema se recupera?
-5. **Como o produto evolui sobre essa arquitetura** — o que muda quando um segundo provedor de cotações for integrado? E quando um novo tipo de ativo for adicionado?
-6. **Segurança** — como a arquitetura protege os dados e as operações dos clientes?
-7. **Observabilidade** — imagine que você recebe o alerta: *"ordens não estão sendo processadas"*. Como você investigaria? Quais logs, métricas ou alarmes te ajudariam?
-8. **Estimativa de custos** — uma estimativa aproximada dos principais componentes
-
----
-
-## Entregas esperadas
-
-| Entrega              | Descrição                                               |
-|---------------------|----------------------------------------------------------|
-| Repositório GitHub  | Código-fonte do projeto                                  |
-| Backend funcional   | API em Node.js + TypeScript                              |
-| Frontend funcional  | Next.js ou Angular                                       |
-| Testes              | Unitários + integração                                   |
-| `README.md`         | Documentação da Parte 1 (como rodar + decisões técnicas) |
-| `ARCHITECTURE.md`   | Diagrama e documentação da Parte 2                       |
-
----
-
-## Dicas
-
-**Se não der tempo de implementar tudo, documente.**
-Descreva o que você faria e como faria. Valorizamos o raciocínio tanto quanto o código pronto.
-
-**Teste seu ambiente antes de entregar.**
-Clone seu repositório em uma pasta diferente e siga suas próprias instruções do zero. Se algo não funcionar, você ainda tem tempo de ajustar.
-
-**Prepare-se para a entrevista.**
-Você vai precisar explicar suas decisões — tanto de código quanto de arquitetura. Pense nos trade-offs de cada escolha.
-
----
-
-Boa sorte! 🚀
+3. Cotações como Dado Volátil (Polling vs Persistência)
+   Premissa: Assumi que as cotações devem ser persistidas localmente no banco de dados do backend, e não apenas consumidas em tempo real da API externa pelo frontend.
+   Por quê: Para permitir auditoria de preços no momento da execução da ordem e para garantir que o sistema continue funcional (exibindo os últimos preços conhecidos) mesmo que o serviço de cotações sofra uma instabilidade temporária.
